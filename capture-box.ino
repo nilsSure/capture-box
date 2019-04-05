@@ -1,6 +1,10 @@
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 
+unsigned long previousButtonMillis = 0; // time when button press last checked
+unsigned long currentMillis = 0;    // stores the value of millis() in each iteration of loop()
+const int buttonInterval = 100; // number of millisecs between button readings
+
 // Button pins
 int redButton = 4;
 int blueButton = 2;
@@ -14,8 +18,8 @@ int redLed = 52;
 int buzzerPin = 12;
 
 // Button values (whether or not they are pressed)
-int redButtonValue = 0;
-int blueButtonValue = 0;
+byte redButtonValue = LOW;
+byte blueButtonValue = LOW;
 
 // Team scores
 int redScore = 0;
@@ -28,21 +32,21 @@ static int blueCapture = 0;
 int MAX_CAP = 100;
 int MIN_CAP = 0;
 // INCREMENT & DECRREMENT
-int CAP = 2;
-int SCORE = 1;
+int INC = 2;
+int DECR = 1;
 
-//const byte rows = 4;
-//const byte cols = 4;
-//
-//char keys[rows][cols] = {
-//  {'1','2','3','A'},
-//  {'4','5','6','B'},
-//  {'7','8','9','C'},
-//  {'*','0','#','D'}
-//};
+const byte rows = 4;
+const byte cols = 4;
 
-//byte rowPins[rows] = {45,43,41,39};
-//byte colPins[cols] = {37,35,33,31};
+char keys[rows][cols] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+byte rowPins[rows] = {45,43,41,39};
+byte colPins[cols] = {37,35,33,31};
 
 //sound constants
 const int c = 261;
@@ -67,7 +71,7 @@ const int aH = 880;
 
 int counter = 0;
 
-//Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
 
 // LCD
 LiquidCrystal_I2C lcd(0x3F,16,2); // set the LCD address to 0x3F for a 16 chars and 2 line display
@@ -77,13 +81,13 @@ LiquidCrystal_I2C lcd(0x3F,16,2); // set the LCD address to 0x3F for a 16 chars 
 void setup() {
   Serial.begin(9600);
     // INPUT from buttons
-  pinMode(redButton, INPUT_PULLUP);
-  pinMode(blueButton, INPUT_PULLUP);
+  pinMode(redButton, INPUT);
+  pinMode(blueButton, INPUT);
   
   // OUTPUT to LED
   pinMode(greenLed, OUTPUT);
-  pinMode(blueLed, OUTPUT);
-  pinMode(redLed, OUTPUT);
+  pinMode(blueLed, INPUT_PULLUP);
+  pinMode(redLed, INPUT_PULLUP);
   
   // OUTPUT to Speaker
 //  pinMode(buzzerPin, OUTPUT);
@@ -100,80 +104,73 @@ void loop()
   // READ the INPUT from the buttons 
   redButtonValue = digitalRead(redButton);
   blueButtonValue = digitalRead(blueButton);
-  
-  
+  currentMillis = millis();
+  readButton(redButton, redButtonValue);
+  readButton(blueButton, blueButtonValue);
+
+  switchButtons(redButton, redButtonValue);
+  switchButtons(blueButton, blueButtonValue)
   if (redButtonValue != LOW) {
     // Red button is being pressed
-    noLight();
-    redLight();
-    redCapSound();
     
-    // If the BLUE capture is greater than MIN_CAP, DECRrease it as the RED button was pressed.
-    if (blueCapture > MIN_CAP) {
-      blueCapture -= CAP; 
-    }
     
-    // If the BLUE capture is MIN_CAP and RED capture is not MAX_CAP yet increase RED capture
-    if (blueCapture == MIN_CAP && redCapture < MAX_CAP) {
-      Serial.print("Value of red capture before: ");
-      Serial.println(redCapture);
-      redCapture += CAP;
-      Serial.print("Value of red capture: ");
-      Serial.println(redCapture);
     }
   } else if (blueButtonValue != LOW) {
     
-    // Blue button is being pressed
-    noLight();
-    blueLight();
-    blueCapSound();
     
-    // If the RED capture is greater than MIN_CAP, DECRrease it as the BLUE button was pressed.
-    if (redCapture > MIN_CAP) {
-      redCapture -= CAP; 
-    }
-    
-    // If the RED capture is MIN_CAP and BLUE capture is not MAX_CAP yet increase BLUE capture
-    if (redCapture == MIN_CAP && blueCapture < MAX_CAP) {
-      blueCapture += CAP;
-      Serial.print("Value of blue capture: ");
-      Serial.println(blueCapture);
-    } 
   } else {
     // No buttons are being pressed
     noLight();
-    greenLight();
     noSound();
     
     // DECRrease the RED capture
-    if (redCapture > MIN_CAP && redCapture < MAX_CAP && blueCapture == MIN_CAP) {
-      redCapture -= CAP; 
+    if (redCapture > MIN_CAP && redCapture < MAX_CAP) {
+      redCapture -= DECR; 
+      delay(100);
     }
     
     // DECRrease the BLUE capture
-    if (blueCapture > MIN_CAP && blueCapture < MAX_CAP && redCapture == MIN_CAP) {
-      blueCapture -= CAP; 
+    if (blueCapture > MIN_CAP && blueCapture < MAX_CAP) {
+      blueCapture -= DECR; 
+      delay(100);
     }
   }
   
-  // If RED capture is at MAX_CAP increase RED score
+
+  increaseScore();
+  displayThings();
+ 
+  // Delay a bit
+  delay(10);
+}
+
+void redLight() {
+  digitalWrite(redLed, HIGH);
+}
+
+void blueLight() {
+  digitalWrite(blueLed, HIGH);
+}
+
+void greenLight() {
+  digitalWrite(greenLed, HIGH);
+}
+
+void increaseScore() {
+    // If RED capture is at MAX_CAP increase RED score
   if (redCapture == MAX_CAP) {
-    noLight();
     redLight();
-//    redCapSound();
-    delay(1000);
-    redScore += SCORE; 
+    redScore += INC; 
   }
   
   // If BLUE capture is at MAX_CAP increase BLUE score
   if (blueCapture == MAX_CAP) {
-    noLight();
     blueLight();
-//    blueCapSound();
-    delay(1000);
-    blueScore += SCORE; 
+    blueScore += INC; 
   }
-  
+}
+
+void displayThings() {
   // Display the RED score
   lcd.setCursor(0, 0);
   lcd.print("R=");
@@ -212,37 +209,79 @@ void loop()
   // Display the BLUE capture
   lcd.print(blueCapture);
   lcd.print("%");
- 
-  // Delay a bit
-  delay(40);
 }
 
-void redLight() {
-  digitalWrite(redLed, HIGH);
+void redButtonAction(boolean redButtonState) {
+    redLight();
+    redCapSound();
+    
+    // If the BLUE capture is greater than MIN_CAP, DECRrease it as the RED button was pressed.
+    if (blueCapture > MIN_CAP) {
+      blueCapture -= DECR; 
+    }
+    
+    // If the BLUE capture is MIN_CAP and RED capture is not MAX_CAP yet increase RED capture
+    if (blueCapture == MIN_CAP && redCapture < MAX_CAP) {
+      redCapture += INC;
+      Serial.print("Value of red capture: ");
+      Serial.println(redCapture);
+    }
 }
 
-void blueLight() {
-  digitalWrite(blueLed, HIGH);
+void blueButtonAction(boolean blueButtonState) {
+   // Blue button is being pressed
+    blueLight();
+    blueCapSound();
+    
+    // If the RED capture is greater than MIN_CAP, DECRrease it as the BLUE button was pressed.
+    if (redCapture > MIN_CAP) {
+      redCapture -= DECR; 
+    }
+    
+    // If the RED capture is MIN_CAP and BLUE capture is not MAX_CAP yet increase BLUE capture
+    if (redCapture == MIN_CAP && blueCapture < MAX_CAP) {
+      blueCapture += INC;
+      Serial.print("Value of blue capture: ");
+      Serial.println(blueCapture);
+    }
 }
 
-void greenLight() {
-  digitalWrite(greenLed, HIGH);
+void readButton(int buttonPin, byte buttonState) {
+
+      // this only reads the button state after the button interval has elapsed
+      //  this avoids multiple flashes if the button bounces
+      // every time the button is pressed it changes buttonLed_State causing the Led to go on or off
+      // Notice that there is no need to synchronize this use of millis() with the flashing Leds
+  
+  if (millis() - previousButtonMillis >= buttonInterval) {
+
+    if (digitalRead(buttonPin) == LOW) {
+      buttonState = ! buttonState; // this changes it to LOW if it was HIGH 
+                                           //   and to HIGH if it was LOW
+      previousButtonMillis += buttonInterval;
+    }
+  }
+
+}
+
+void switchButtons(int buttonPin, buttonState) {
+  digitalWrite(buttonPin, buttonState);
 }
 
 void startSequence() {
-  sound();
-  digitalWrite(redLed, HIGH);
-  delay(500);
-  digitalWrite(redLed, LOW);
-  delay(500);
-  digitalWrite(greenLed, HIGH);
-  delay(500);
-  digitalWrite(greenLed, LOW);
-  delay(500);
-  digitalWrite(blueLed, HIGH);
-  delay(500);
-  digitalWrite(blueLed, LOW);
-  delay(500);
+//  sound();
+//  digitalWrite(redLed, HIGH);
+//  delay(500);
+//  digitalWrite(redLed, LOW);
+//  delay(500);
+//  digitalWrite(greenLed, HIGH);
+//  delay(500);
+//  digitalWrite(greenLed, LOW);
+//  delay(500);
+//  digitalWrite(blueLed, HIGH);
+//  delay(500);
+//  digitalWrite(blueLed, LOW);
+//  delay(500);
   lcd.setCursor(5,0);
   lcd.print("READY!");
   delay(100);
