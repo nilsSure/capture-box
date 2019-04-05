@@ -22,31 +22,27 @@ int redScore = 0;
 int blueScore = 0;
 
 // Team captures
-int redCapture = 0;
-int blueCapture = 0;
+static int redCapture = 0;
+static int blueCapture = 0;
 
 int MAX_CAP = 100;
 int MIN_CAP = 0;
-// INCREMENT & DECREMENT
-int INC = 1;
+// INCREMENT & DECRREMENT
+int CAP = 2;
+int SCORE = 1;
 
-const byte rows = 4;
-const byte cols = 4;
+//const byte rows = 4;
+//const byte cols = 4;
+//
+//char keys[rows][cols] = {
+//  {'1','2','3','A'},
+//  {'4','5','6','B'},
+//  {'7','8','9','C'},
+//  {'*','0','#','D'}
+//};
 
-char keys[rows][cols] = {
-  {'1','2','3','A'},
-  {'4','5','6','B'},
-  {'7','8','9','C'},
-  {'*','0','#','D'}
-};
-
-byte rowPins[rows] = {45,43,41,39};
-byte colPins[cols] = {37,35,33,31};
-
-Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
-
-// LCD
-LiquidCrystal_I2C lcd(0x3F,16,2); // set the LCD address to 0x3F for a 16 chars and 2 line display
+//byte rowPins[rows] = {45,43,41,39};
+//byte colPins[cols] = {37,35,33,31};
 
 //sound constants
 const int c = 261;
@@ -71,11 +67,18 @@ const int aH = 880;
 
 int counter = 0;
 
-void setup()
-{
-  // INPUT from buttons
-  pinMode(redButton, INPUT);
-  pinMode(blueButton, INPUT);
+//Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, rows, cols);
+
+// LCD
+LiquidCrystal_I2C lcd(0x3F,16,2); // set the LCD address to 0x3F for a 16 chars and 2 line display
+
+
+
+void setup() {
+  Serial.begin(9600);
+    // INPUT from buttons
+  pinMode(redButton, INPUT_PULLUP);
+  pinMode(blueButton, INPUT_PULLUP);
   
   // OUTPUT to LED
   pinMode(greenLed, OUTPUT);
@@ -83,14 +86,13 @@ void setup()
   pinMode(redLed, OUTPUT);
   
   // OUTPUT to Speaker
-  pinMode(buzzerPin, OUTPUT);
+//  pinMode(buzzerPin, OUTPUT);
   
   // INIT the LCD
   lcd.init(); //initialize the lcd
   lcd.backlight(); //open the backlight 
 
-  lcd.setCursor(5,0);
-  lcd.print("READY!");
+  startSequence();
 }
 
 void loop()
@@ -100,63 +102,76 @@ void loop()
   blueButtonValue = digitalRead(blueButton);
   
   
-  if (redButtonValue != 0) {
+  if (redButtonValue != LOW) {
     // Red button is being pressed
-    
+    noLight();
     redLight();
-    sound();
+    redCapSound();
     
-    // If the BLUE capture is greater than MIN_CAP, decrease it as the RED button was pressed.
+    // If the BLUE capture is greater than MIN_CAP, DECRrease it as the RED button was pressed.
     if (blueCapture > MIN_CAP) {
-      blueCapture -= INC; 
+      blueCapture -= CAP; 
     }
     
     // If the BLUE capture is MIN_CAP and RED capture is not MAX_CAP yet increase RED capture
     if (blueCapture == MIN_CAP && redCapture < MAX_CAP) {
-      redCapture += INC;
+      Serial.print("Value of red capture before: ");
+      Serial.println(redCapture);
+      redCapture += CAP;
+      Serial.print("Value of red capture: ");
+      Serial.println(redCapture);
     }
-  }
-  else if (blueButtonValue != 0) {
+  } else if (blueButtonValue != LOW) {
+    
     // Blue button is being pressed
-    
+    noLight();
     blueLight();
-    sound();
+    blueCapSound();
     
-    // If the RED capture is greater than MIN_CAP, decrease it as the BLUE button was pressed.
+    // If the RED capture is greater than MIN_CAP, DECRrease it as the BLUE button was pressed.
     if (redCapture > MIN_CAP) {
-      redCapture -= INC; 
+      redCapture -= CAP; 
     }
     
     // If the RED capture is MIN_CAP and BLUE capture is not MAX_CAP yet increase BLUE capture
     if (redCapture == MIN_CAP && blueCapture < MAX_CAP) {
-      blueCapture += INC; 
-    }
+      blueCapture += CAP;
+      Serial.print("Value of blue capture: ");
+      Serial.println(blueCapture);
+    } 
   } else {
     // No buttons are being pressed
     noLight();
+    greenLight();
     noSound();
     
-    // Decrease the RED capture
-    if (redCapture > MIN_CAP && redCapture < MAX_CAP) {
-      redCapture -= INC; 
+    // DECRrease the RED capture
+    if (redCapture > MIN_CAP && redCapture < MAX_CAP && blueCapture == MIN_CAP) {
+      redCapture -= CAP; 
     }
     
-    // Decrease the BLUE capture
-    if (blueCapture > MIN_CAP && blueCapture < MAX_CAP) {
-      blueCapture -= INC; 
+    // DECRrease the BLUE capture
+    if (blueCapture > MIN_CAP && blueCapture < MAX_CAP && redCapture == MIN_CAP) {
+      blueCapture -= CAP; 
     }
   }
   
   // If RED capture is at MAX_CAP increase RED score
   if (redCapture == MAX_CAP) {
+    noLight();
     redLight();
-    redScore += INC; 
+//    redCapSound();
+    delay(1000);
+    redScore += SCORE; 
   }
   
   // If BLUE capture is at MAX_CAP increase BLUE score
   if (blueCapture == MAX_CAP) {
+    noLight();
     blueLight();
-    blueScore += INC; 
+//    blueCapSound();
+    delay(1000);
+    blueScore += SCORE; 
   }
   
   // Display the RED score
@@ -199,46 +214,7 @@ void loop()
   lcd.print("%");
  
   // Delay a bit
-  delay(10);
-}
-
-void sound() {
-    //Play first section
-  firstSection();
- 
-  //Play second section
-  secondSection();
- 
-  //Variant 1
-  beep(f, 250);  
-  beep(gS, 500);  
-  beep(f, 350);  
-  beep(a, 125);
-  beep(cH, 500);
-  beep(a, 375);  
-  beep(cH, 125);
-  beep(eH, 650);
- 
-  delay(500);
- 
-  //Repeat second section
-  secondSection();
- 
-  //Variant 2
-  beep(f, 250);  
-  beep(gS, 500);  
-  beep(f, 375);  
-  beep(cH, 125);
-  beep(a, 500);  
-  beep(f, 375);  
-  beep(cH, 125);
-  beep(a, 650);  
- 
-  delay(650);
-}
-
-void noSound() {
-  analogWrite(buzzerPin, 0); 
+  delay(40);
 }
 
 void redLight() {
@@ -246,17 +222,45 @@ void redLight() {
 }
 
 void blueLight() {
-digitalWrite(blueLed, HIGH);
+  digitalWrite(blueLed, HIGH);
 }
 
 void greenLight() {
- digitalWrite(greenLed, HIGH); 
+  digitalWrite(greenLed, HIGH);
+}
+
+void startSequence() {
+  sound();
+  digitalWrite(redLed, HIGH);
+  delay(500);
+  digitalWrite(redLed, LOW);
+  delay(500);
+  digitalWrite(greenLed, HIGH);
+  delay(500);
+  digitalWrite(greenLed, LOW);
+  delay(500);
+  digitalWrite(blueLed, HIGH);
+  delay(500);
+  digitalWrite(blueLed, LOW);
+  delay(500);
+  lcd.setCursor(5,0);
+  lcd.print("READY!");
+  delay(100);
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("R=0...........0%");
+  lcd.setCursor(0,1);
+  lcd.print("B=0...........0%");
 }
 
 void noLight() {
  digitalWrite(greenLed, LOW);
  digitalWrite(blueLed, LOW);
  digitalWrite(redLed, LOW);
+}
+
+void noSound() {
+  analogWrite(buzzerPin, LOW); 
 }
 
 int getNumberLength(int x) {
@@ -272,6 +276,11 @@ int getNumberLength(int x) {
     return 1;
 }
 
+void sound() {
+  //Play first section
+  firstSection();
+}
+
 void beep(int note, int duration)
 {
   //Play tone on buzzerPin
@@ -280,14 +289,22 @@ void beep(int note, int duration)
   //Play different LED depending on value of 'counter'
   if(counter % 2 == 0)
   {
-    digitalWrite(redLed, HIGH);
+//    digitalWrite(redLed, HIGH);
     delay(duration);
-    digitalWrite(redLed, LOW);
+//    digitalWrite(redLed, LOW);
   }else
   {
-    digitalWrite(blueLed, HIGH);
+//    digitalWrite(blueLed, HIGH);
     delay(duration);
-    digitalWrite(blueLed, LOW);
+//    digitalWrite(blueLed, LOW);
+  }
+
+  if (redButtonValue != 0) {
+    redLight();
+  }
+
+  if (blueButtonValue != 0) {
+    blueLight();
   }
  
   //Stop tone on buzzerPin
@@ -325,28 +342,17 @@ void firstSection()
  
   delay(500);
 }
- 
-void secondSection()
+
+void redCapSound()
 {
-  beep(aH, 500);
-  beep(a, 300);
-  beep(a, 150);
-  beep(aH, 500);
-  beep(gSH, 325);
-  beep(gH, 175);
-  beep(fSH, 125);
-  beep(fH, 125);    
-  beep(fSH, 250);
- 
-  delay(325);
- 
-  beep(aS, 250);
-  beep(dSH, 500);
-  beep(dH, 325);  
-  beep(cSH, 175);  
-  beep(cH, 125);  
-  beep(b, 125);  
-  beep(cH, 250);  
- 
-  delay(350);
+  beep(cH, 150);  
+  beep(a, 500);
+  beep(f, 350);
+}
+
+void blueCapSound()
+{
+  beep(f, 350);
+  beep(a, 500);
+  beep(cH, 150); 
 }
