@@ -1,4 +1,4 @@
 # capture-box
 Capture box Arduino project
 
-Latest version should be on the v4 branch
+This is the one that works. Other branches contain experiments
