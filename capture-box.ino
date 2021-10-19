@@ -25,9 +25,6 @@ byte blueButtonValue = LOW;
 int redScore = 0;
 int blueScore = 0;
 
-// Team captures
-static int redCapture = 0;
-static int blueCapture = 0;
 
 int MAX_CAP = 100;
 int MIN_CAP = 0;
