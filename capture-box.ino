@@ -1,18 +1,6 @@
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 
-unsigned long previousButtonMillis = 0; // time when button press last checked
-unsigned long currentMillis = 0;    // stores the value of millis() in each iteration of loop()
-const int buttonInterval = 100; // number of millisecs between button readings
-
-// Button pins
-int redButton = 4;
-int blueButton = 2;
-
-// LED pins
-int greenLed = 48;
-int blueLed = 50;
-int redLed = 52;
 
 // Speaker pin
 int buzzerPin = 12;
